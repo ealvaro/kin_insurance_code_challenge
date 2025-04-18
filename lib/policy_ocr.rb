@@ -70,4 +70,34 @@ module PolicyOcr
     rescue ArgumentError
       false
     end
+    
+    # Given a raw 9‑char policy string, return it plus any status tag:
+    #  • “ ILL” if it contains “?”
+    #  • “ ERR” if it’s all digits but checksum fails
+    #  • “” otherwise
+    #
+    # @param raw [String] 9 chars, digits or “?”
+    # @return [String] e.g. "86110??36 ILL"
+    def self.format_result(raw)
+      if raw.include?('?')
+        "#{raw} ILL"
+      elsif !valid?(raw)
+        "#{raw} ERR"
+      else
+        raw
+      end
+    end
+
+    # Process one input file and write an output file, one line per entry.
+    #
+    # @param input_path[String]  path to the OCR‐style text file
+    # @param output_path[String] path to write results to
+    # @return [void]
+    def self.write_results(input_path, output_path)
+      entries = parse_file(input_path)
+      lines   = entries.map { |raw| format_result(raw) }
+      File.open(output_path, 'w') do |f|
+        lines.each { |line| f.puts line }
+      end
+    end    
   end

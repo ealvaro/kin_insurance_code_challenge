@@ -73,4 +73,26 @@ RSpec.describe PolicyOcr do
       expect(PolicyOcr.valid?('abcde1234')).to be false
     end
   end
+
+  describe '.write_results' do
+    it 'writes one line per entry, with ILL/ERR tags' do
+      input  = Tempfile.new('ocr_in')
+      output = Tempfile.new('ocr_out')
+      input.write(fixture('sample'))
+      input.rewind
+      output.close  # we'll overwrite
+  
+      PolicyOcr.write_results(input.path, output.path)
+  
+      actual = File.readlines(output.path, chomp: true)
+      expected = PolicyOcr.parse_file(input.path).map do |raw|
+        PolicyOcr.format_result(raw)
+      end
+  
+      expect(actual).to eq(expected)
+    ensure
+      input.close!
+      output.close!
+    end
+  end
 end
