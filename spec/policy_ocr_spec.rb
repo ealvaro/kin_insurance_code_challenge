@@ -45,4 +45,32 @@ RSpec.describe PolicyOcr do
   ensure
     file.close!
   end
+
+  describe '.checksum' do
+    it 'computes the correct mod‑11 checksum' do
+      # example from prompt: 3 4 5 8 8 2 8 6 5 => checksum 0
+      expect(PolicyOcr.checksum('345882865')).to eq(0)
+
+      # a simple invalid one: all 1s → sum 45 % 11 == 1
+      expect(PolicyOcr.checksum('111111111')).to eq(1)
+    end
+
+    it 'raises if the input is not exactly 9 digits' do
+      expect { PolicyOcr.checksum('123')       }.to raise_error(ArgumentError)
+      expect { PolicyOcr.checksum('abcd56789') }.to raise_error(ArgumentError)
+    end
+  end
+
+  describe '.valid?' do
+    it 'returns true for valid policy numbers' do
+      expect(PolicyOcr.valid?('345882865')).to be true
+      expect(PolicyOcr.valid?('000000000')).to be true
+    end
+
+    it 'returns false for invalid or malformed inputs' do
+      expect(PolicyOcr.valid?('111111111')).to be false
+      expect(PolicyOcr.valid?('123')).to       be false
+      expect(PolicyOcr.valid?('abcde1234')).to be false
+    end
+  end
 end

@@ -41,4 +41,33 @@ module PolicyOcr
         DIGIT_PATTERNS.fetch(pattern, "?")
       end.join
     end
+
+    # Calculate the “mod‑11” checksum for a 9‑digit policy number.
+    #
+    # @param policy_number [String] exactly 9 characters, each '0'–'9'
+    # @return [Integer] the checksum: (d1 + 2*d2 + … + 9*d9) % 11
+    # @raise [ArgumentError] if policy_number is not a 9‑digit string
+    def self.checksum(policy_number)
+      unless policy_number =~ /\A\d{9}\z/
+        raise ArgumentError, "policy_number must be a 9‑digit string"
+      end
+
+      # reverse so that index 0 (weight 1) is the rightmost digit (d1)
+      policy_number
+        .chars
+        .reverse
+        .map.with_index(1) { |char, weight| char.to_i * weight }
+        .sum % 11
+    end
+
+    # Returns true iff the policy number is numeric, 9 characters,
+    # and its checksum is 0.
+    #
+    # @param policy_number [String]
+    # @return [Boolean]
+    def self.valid?(policy_number)
+      checksum(policy_number) == 0
+    rescue ArgumentError
+      false
+    end
   end
