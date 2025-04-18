@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+# bin/policy_ocr
+
+require_relative '../lib/policy_ocr'
+
+# assume files named “ocr_in” and “ocr_out” live in the project root:
+input, output = ARGV.size == 2 ? ARGV : ['ocr_in', 'ocr_out']
+input  = File.expand_path(input,  Dir.pwd)
+output = File.expand_path(output, Dir.pwd)
+
+unless File.exist?(input)
+  abort "ERROR: input file not found: #{input}"
+end
+
+PolicyOcr.write_results(input, output)
+puts "✅  Wrote OCR results to #{output}"

@@ -71,6 +71,7 @@ RSpec.describe PolicyOcr do
       expect(PolicyOcr.valid?('111111111')).to be false
       expect(PolicyOcr.valid?('123')).to       be false
       expect(PolicyOcr.valid?('abcde1234')).to be false
+      expect(PolicyOcr.valid?('34588286?')).to be false
     end
   end
 
