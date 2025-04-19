@@ -14,32 +14,34 @@ module PolicyOcr
       " _ |_| _|" => "9"
     }.freeze
   
+    ALL_PATTERNS = DIGIT_PATTERNS.keys.freeze
+
+    # @param path [String] path to OCR text file
+    # @return [Array<Array<String>>] list of entries; each entry is an Array of 9 raw 3×3 patterns
+    def self.load_patterns(path)
+      lines = File.readlines(path, chomp: true)
+      raise ArgumentError, "File length must be a multiple of 4 lines" unless lines.size % 4 == 0
+  
+      lines.each_slice(4).map do |top, mid, bot, _blank|
+        (0...9).map { |i| top[i*3,3] + mid[i*3,3] + bot[i*3,3] }
+      end
+    end
+
     # Parses the entire file at `path` into an Array of 9‑character strings
     # (one entry per 4 lines)
     #
     # @param path[String] path to your OCR text file
     # @return [Array<String>] each element is the 9‑digit (or “?”) string
     def self.parse_file(path)
-      lines = File.readlines(path, chomp: true)
-      # Group into 4-line entries (last line is blank)
-      entries = lines.each_slice(4).to_a
-      entries.map { |entry_lines| parse_entry(entry_lines) }
+      load_patterns(path).map { |pats| parse_entry(pats) }
     end
   
     # Parses one 4‑line entry into its 9‑character string
     #
-    # @param lines[Array<String>] exactly 4 elements
-    # @return [String] 9‑char result, using "?" for any unrecognized digit
-    def self.parse_entry(lines)
-      unless lines.size == 4
-        raise ArgumentError, "Expected 4 lines per entry, got #{lines.size}"
-      end
-  
-      # take the first 3 rows, chop them into 9 chunks of width 3, then look up each
-      (0...9).map do |i|
-        pattern = lines[0][i*3,3] + lines[1][i*3,3] + lines[2][i*3,3]
-        DIGIT_PATTERNS.fetch(pattern, "?")
-      end.join
+    # @param patterns [Array<String>] array of 9 OCR patterns
+    # @return [String] 9-character string, using "?" for unrecognized digits
+    def self.parse_entry(patterns)
+      patterns.map { |pat| DIGIT_PATTERNS.fetch(pat, "?") }.join
     end
 
     # Calculate the “mod‑11” checksum for a 9‑digit policy number.
@@ -64,7 +66,7 @@ module PolicyOcr
     # and its checksum is 0.
     #
     # @param policy_number [String]
-    # @return [Boolean]
+    # @return [Boolean] true if checksum == 0
     def self.valid?(policy_number)
       checksum(policy_number) == 0
     rescue ArgumentError
@@ -99,5 +101,59 @@ module PolicyOcr
       File.open(output_path, 'w') do |f|
         lines.each { |line| f.puts line }
       end
-    end    
+    end
+
+    # @param pattern [String] a 9‑char OCR pattern
+    # @return [Array<String>] all valid patterns at Hamming distance == 1
+    def self.neighbors(pattern)
+      ALL_PATTERNS.select { |cand|
+        pattern.chars.zip(cand.chars).count { |a, b| a != b } == 1
+      }
+    end
+
+    # Try to correct a single‑segment error in exactly one digit‑box.
+    #
+    # @param patterns [Array<String>] array of 9 OCR patterns
+    # @return [Array(String,String)] [corrected_number, tag] where tag is ""|"ILL"|"ERR"|"AMB"
+    def self.correct_entry(patterns)
+      raw = parse_entry(patterns)
+      original_tag =
+        if raw.include?('?') then "ILL"
+        elsif !valid?(raw)    then "ERR"
+        else                      ""
+        end
+
+      return [raw, ""] if original_tag.empty?
+
+      fixes = []
+      patterns.each_with_index do |pat, idx|
+        neighbors(pat).each do |fixed|
+          trial = patterns.dup
+          trial[idx] = fixed
+          num = parse_entry(trial)
+          next if num.include?("?")
+          fixes << num if valid?(num)
+        end
+      end
+
+      uniq = fixes.uniq
+      case uniq.size
+      when 1 then [uniq.first,     ""           ]
+      when 0 then [raw,            original_tag ]
+      else       [raw,            "AMB"        ]
+      end
+    end
+
+    # Swaps in correct_entry when writing results
+    # @param input_path [String]
+    # @param output_path [String]
+    # @return [void]
+    def self.write_results_with_guess(input_path, output_path)
+      File.open(output_path, 'w') do |out|
+        load_patterns(input_path).each do |patterns|
+          num, tag = correct_entry(patterns)
+          out.puts(tag.empty? ? num : "#{num} #{tag}")
+        end
+      end
+    end
   end

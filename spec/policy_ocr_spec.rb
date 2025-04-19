@@ -96,4 +96,36 @@ RSpec.describe PolicyOcr do
       output.close!
     end
   end
+
+  let(:digit_to_pattern) { PolicyOcr::DIGIT_PATTERNS.invert }
+
+  describe '.correct_entry' do
+    it 'fixes a single‐segment error and returns no tag' do
+      original = '345882865'
+      # break that into its 9 patterns
+      patterns = original.chars.map { |d| digit_to_pattern[d] }
+
+      # simulate missing one "|" in the first digit's 3×3
+      bad0 = patterns.first.dup
+      bad0[bad0.index('|')] = ' '
+      patterns_error = [bad0] + patterns[1..-1]
+
+      corrected, status = PolicyOcr.correct_entry(patterns_error)
+      expect(corrected).to eq(original)
+      expect(status).to eq('')
+    end
+
+    it 'leaves it ILL when no single‐segment fix yields a valid checksum' do
+      original = '345882865'
+      patterns = original.chars.map { |d| digit_to_pattern[d] }
+
+      # completely blank out the first digit
+      blank = ' ' * 9
+      patterns_error = [blank] + patterns[1..-1]
+
+      corrected, status = PolicyOcr.correct_entry(patterns_error)
+      expect(corrected).to eq('?45882865')
+      expect(status).to eq('ILL')
+    end
+  end
 end
