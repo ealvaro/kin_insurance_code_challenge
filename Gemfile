@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 source "https://rubygems.org"
 
-gem "rspec"
-gem "byebug"
+group :development, :test do
+  gem "rspec"
+  gem "byebug"
+end

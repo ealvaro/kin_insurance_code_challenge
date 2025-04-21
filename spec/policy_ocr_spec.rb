@@ -128,4 +128,52 @@ RSpec.describe PolicyOcr do
       expect(status).to eq('ILL')
     end
   end
+
+  describe 'ambiguous (AMB) corrections' do
+    it 'flags AMB when more than one valid single‑segment fix exists' do
+      # make the first digit completely unreadable
+      blank    = ' ' * 9
+      pattern0 = digit_to_pattern['0']
+      pattern1 = digit_to_pattern['1']
+      pattern7 = digit_to_pattern['7']
+  
+      # eight zeros after the blank
+      patterns = [blank] + [pattern0] * 8
+  
+      # stub neighbors so only the blank slot yields two possible fixes
+      allow(PolicyOcr).to receive(:neighbors) do |pat|
+        pat == blank ? [pattern1, pattern7] : []
+      end
+  
+      # force any candidate number to pass checksum
+      allow(PolicyOcr).to receive(:valid?).and_return(true)
+  
+      _, tag = PolicyOcr.correct_entry(patterns)
+      expect(tag).to eq('AMB')
+    end
+  end
+
+  describe 'bulk‑processing performance' do
+    it 'handles 500 entries in under 0.5s' do
+      require 'benchmark'
+      zero_entry = [
+        " _  _  _  _  _  _  _  _  _ ",
+        "| || || || || || || || || |",
+        "|_||_||_||_||_||_||_||_||_|",
+        ""
+      ]
+  
+      input = Tempfile.new('bulk')
+      500.times { zero_entry.each { |line| input.write(line + "\n") } }
+      input.rewind
+  
+      time = Benchmark.realtime do
+        PolicyOcr.write_results_with_guess(input.path, '/dev/null')
+      end
+  
+      expect(time).to be < 0.5
+    ensure
+      input.close!
+    end
+  end
 end
