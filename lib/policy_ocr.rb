@@ -168,10 +168,22 @@ module PolicyOcr
       end
 
       uniq = fixes.uniq
-      case uniq.size
-      when 1 then [uniq.first,     ""           ]
-      when 0 then [raw,            original_tag ]
-      else       [raw,            "AMB"        ]
+      return [uniq.first, ""] if uniq.size == 1
+
+      # If we have multiple valid numbers, check for ambiguity
+      if uniq.size > 1
+        mod13 = uniq.select { |num| num.to_i % 13 == 0 }
+        if mod13.size == 1
+          return [mod13.first, ""] # we picked a unique mod-13 number
+        end
+      end
+
+      # If we have multiple valid numbers, return the original
+      if uniq.empty?
+        return [raw, original_tag]
+      else
+        # If we have multiple valid numbers, return the first one
+        return [raw, "AMB"]
       end
     end
 
